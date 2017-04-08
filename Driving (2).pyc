@@ -1,0 +1,227 @@
+# Embedded file name: Driving.py
+import viz
+import vizconnect
+import vizact
+import vizinfo
+import vizinput
+import vizcam
+viz.setMultiSample(4)
+NUM_CARS = 0
+carlist = []
+pivot = [0, 0, 0]
+carchoice = 1
+currentcar = ' '
+speed = 0.0
+steer = 0.0
+motion = 0
+rotateY = 0.0
+rotateX = 0.0
+viz.clip(0.1, 30000)
+vizconnect.go('camera.py')
+viz.splashScreen('assets/tracksplash.jpg')
+viz.phys.enable()
+carchoiceinit = vizinput.choose('Choose a car:', ['Mini',
+ 'BMW',
+ 'Ford Thunderbird',
+ 'Ford Focus',
+ 'Lamborghini Murcielago',
+ 'TVR Speed 12',
+ 'Dodge Challenger',
+ 'Caterham Seven'])
+carchoice = carchoiceinit + 1
+environmentchoice = vizinput.choose('Select time of day:', ['Day', 'Night'])
+import Drivingfunctions
+track = viz.addChild('assets/environment/track.osgb')
+station = viz.addChild('assets/environment/gasStation.fbx')
+buildings = viz.addChild('assets/environment/City.osgb')
+tower = viz.addChild('assets/environment/Building.fbx')
+if environmentchoice == 0:
+    environment = viz.addChild('sky_day.osgb')
+else:
+    environment = viz.addChild('sky_night.osgb')
+environment.setScale(10, 10, 10)
+track.setScale(5, 0, 5)
+station.setScale(5, 5, 5)
+buildings.setScale(1, 1, 1)
+station.setEuler(90, 0, 0)
+track.setPosition(260, -3, 15)
+tower.setPosition(500, -3, -75)
+tower.setScale(1.5, 4, 1.5)
+station.setPosition(-100, -3.3, 250)
+station.collideMesh()
+buildings.collideMesh()
+tower.collideMesh()
+speeddisplay = viz.addTextbox()
+speeddisplay.setPosition(0.11, 0.985)
+steerdisplay = viz.addTextbox()
+steerdisplay.setPosition(0.11, 0.95)
+cardisplay = viz.addTextbox()
+cardisplay.setPosition(0.9, 0.02)
+rotateXdisplay = viz.addTextbox()
+rotateXdisplay.setPosition(0.5, 0.5)
+rotateYdisplay = viz.addTextbox()
+rotateYdisplay.setPosition(0.5, 0.7)
+headLight = viz.MainView.getHeadLight()
+headLight.disable()
+myLight = viz.addLight()
+if environmentchoice == 0:
+    myLight.intensity(1)
+else:
+    myLight.intensity(0.25)
+myLight.setEuler(45, 12, 0)
+camera = vizconnect.getTransport('orientation')
+viz.link(offsetNode, camera.getNode3d())
+
+def ChangeCar(direction):
+    global carchoice
+    global speed
+    global accel
+    global steer
+    if direction == 2:
+        carchoice += 1
+        if carchoice > NUM_CARS:
+            carchoice = 1
+    else:
+        carchoice -= 1
+        if carchoice <= 0:
+            carchoice = NUM_CARS
+    offsetNode.setPosition(0, 0, 0)
+    offsetNode.setEuler(0, 0, 0)
+    speed = 0.0
+    steer = 0.0
+    accel = 0
+    rotateX = 0
+    rotateY = 0
+    view.setEuler(0, 0, 0)
+
+
+def CarUpdate():
+    global rotateX
+    global currentcar
+    global speed
+    global rotateY
+    for car in carlist:
+        if car.no == carchoice:
+            car.selected = 1
+        else:
+            car.selected = 0
+        if car.selected == 1:
+            currentcar = car.name
+            car.alpha(1)
+            if speed > 0:
+                speed -= car.deaccel
+            if speed < 0:
+                speed += car.deaccel
+        else:
+            car.alpha(0)
+
+    if speed < 0.1:
+        motion = 0
+    else:
+        motion = 1
+    move = vizact.move([0, 0, speed / 1.5], 0.1)
+    rotate = vizact.spin(0, 1, 0, steer * (speed / 1.5) * 0.05, 0.1)
+    viewmoveX = vizact.spinTo(quat=[rotateX,
+     rotateY,
+     0,
+     2], time=0.1)
+    offsetNode.clearActions()
+    offsetNode.clearActionList()
+    offsetNode.add(move, 0)
+    offsetNode.add(rotate, 1)
+    environment.setPosition(offsetNode.getPosition())
+    speeddisplay.message('Speed: ' + str(speed))
+    steerdisplay.message('Steer: ' + str(steer))
+    cardisplay.message(str(currentcar))
+    rotateXdisplay.message('X: ' + str(rotateX))
+    rotateYdisplay.message('Y: ' + str(rotateY))
+
+
+def Accelerate():
+    global speed
+    for car in carlist:
+        if car.selected == 1:
+            if speed < car.maxspeed + car.accel:
+                speed += car.accel
+            else:
+                speed = car.maxspeed + car.accel
+
+
+def Brake():
+    global speed
+    for car in carlist:
+        if car.selected == 1:
+            if speed > 0:
+                speed -= car.brake
+            if speed < 0:
+                speed += car.brake
+
+
+def SteerRight():
+    global steer
+    for car in carlist:
+        if car.selected == 1:
+            if steer < car.handlerightmax:
+                steer += car.handle
+
+
+def SteerLeft():
+    global steer
+    for car in carlist:
+        if car.selected == 1:
+            if steer > car.handleleftmax:
+                steer -= car.handle
+
+
+def Reverse():
+    global motion
+    global speed
+    for car in carlist:
+        if car.selected == 1:
+            if motion == 0:
+                if speed > -(car.maxspeed / 2):
+                    speed -= car.accel / 2
+                    accel = 1
+
+
+def RotateLeft():
+    global rotateX
+    rotateX -= 0.02
+
+
+def RotateRight():
+    global rotateX
+    rotateX += 0.02
+
+
+def RotateUp():
+    global rotateY
+    rotateY += 0.02
+
+
+def RotateDown():
+    global rotateY
+    rotateY -= 0.02
+
+
+def ResetView():
+    global rotateX
+    global rotateY
+    rotateY = 0
+    rotateX = 0
+    view.setEuler(0, 0, 0)
+
+
+vizact.onkeydown('[', ChangeCar, 1)
+vizact.onkeydown(']', ChangeCar, 2)
+vizact.ontimer(0.1, CarUpdate)
+vizact.whilekeydown(viz.KEY_UP, Accelerate)
+vizact.whilekeydown(' ', Brake)
+vizact.whilekeydown(viz.KEY_LEFT, SteerLeft)
+vizact.whilekeydown(viz.KEY_RIGHT, SteerRight)
+vizact.whilekeydown(viz.KEY_DOWN, Reverse)
+vizact.whilekeydown('q', ResetView)
+vizact.whilekeydown('a', RotateLeft)
+vizact.whilekeydown('d', RotateRight)
+vizact.whilekeydown('w', RotateUp)
+vizact.whilekeydown('s', RotateDown)
